@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wanderlust AI — Smart Travel Planner</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked.js for Markdown Rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 lg:px-6 py-3 flex items-center justify-between shadow-xs">
+    <div class="flex items-center space-x-3">
+      <button id="toggle-sidebar-btn" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors" title="Toggle Saved Trips">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+      <div class="flex items-center space-x-2.5 cursor-pointer" id="brand-logo-btn">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i data-lucide="compass" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-none">Wanderlust<span class="text-blue-600 dark:text-blue-400">AI</span></h1>
+          <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Local Travel Concierge</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Model Selector & Live Status Badges -->
+    <div class="hidden md:flex items-center space-x-3 text-xs">
+      <!-- Model selector -->
+      <div class="flex items-center bg-slate-100 dark:bg-slate-800/80 rounded-lg px-2.5 py-1.5 border border-slate-200/80 dark:border-slate-700/80">
+        <i data-lucide="cpu" class="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 mr-2"></i>
+        <span class="text-slate-500 dark:text-slate-400 mr-1.5 font-medium">Model:</span>
+        <select id="model-select" class="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-hidden cursor-pointer">
+          <option value="llama3.2:latest">llama3.2:latest</option>
+          <option value="llama3.2:1b">llama3.2:1b</option>
+          <option value="llama3.1:latest">llama3.1:latest</option>
+          <option value="qwen2.5:3b">qwen2.5:3b</option>
+        </select>
+      </div>
+
+      <!-- Ollama Status Pill -->
+      <div id="ollama-status-badge" class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="ollama-status-text" class="font-medium">Ollama Online</span>
+      </div>
+
+      <!-- Database Status Pill -->
+      <div id="db-status-badge" class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-300">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        <span id="db-status-text" class="font-medium">PostgreSQL 18</span>
+      </div>
+    </div>
+
+    <!-- Right Controls: New Trip & Dark Mode -->
+    <div class="flex items-center space-x-2">
+      <button id="new-trip-btn" class="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-lg shadow-sm shadow-blue-600/20 transition-all hover:shadow-md">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        <span>New Trip</span>
+      </button>
+
+      <button id="theme-toggle-btn" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors" title="Toggle Light/Dark Mode">
+        <i data-lucide="moon" id="theme-moon-icon" class="w-4 h-4 hidden dark:block"></i>
+        <i data-lucide="sun" id="theme-sun-icon" class="w-4 h-4 block dark:hidden"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Body Area -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Sidebar: Saved Trips -->
+    <aside id="sidebar" class="w-80 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col flex-shrink-0 transition-all duration-300 z-30 fixed lg:static inset-y-0 left-0 -translate-x-full lg:translate-x-0 shadow-xl lg:shadow-none">
+      <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="bookmark" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+          <h2 class="font-bold text-sm text-slate-800 dark:text-slate-200">Saved Trips</h2>
+          <span id="trip-count-badge" class="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full font-semibold">0</span>
+        </div>
+        <button id="close-sidebar-mobile-btn" class="lg:hidden p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Search saved trips -->
+      <div class="p-3 border-b border-slate-100 dark:border-slate-800/60">
+        <div class="relative">
+          <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400"></i>
+          <input type="text" id="trip-search-input" placeholder="Search saved itineraries..." class="w-full bg-slate-100 dark:bg-slate-800 text-xs pl-8 pr-3 py-2 rounded-lg border border-transparent focus:border-blue-500 focus:outline-hidden dark:text-slate-200 placeholder-slate-400">
+        </div>
+      </div>
+
+      <!-- Trip List Container -->
+      <div id="saved-trips-list" class="flex-1 overflow-y-auto p-3 space-y-2">
+        <!-- Trip Cards injected via JS -->
+        <div id="sidebar-loading" class="text-center py-8 text-slate-400 text-xs">
+          <i data-lucide="loader" class="w-5 h-5 mx-auto animate-spin mb-2 text-blue-500"></i>
+          Loading saved trips...
+        </div>
+      </div>
+
+      <!-- Sidebar Footer Info -->
+      <div class="p-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+        <span>Runs 100% locally</span>
+        <span class="flex items-center text-emerald-600 dark:text-emerald-400"><i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1"></i> Private & Safe</span>
+      </div>
+    </aside>
+
+    <!-- Overlay backdrop for mobile sidebar -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-xs z-20 hidden lg:hidden"></div>
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="flex-1 overflow-y-auto flex flex-col bg-slate-50 dark:bg-slate-950">
+
+      <!-- SECTION 1: TRIP BUILDER & INPUT FORM -->
+      <div id="trip-input-container" class="max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- Welcome Banner -->
+        <div class="text-center space-y-2 pt-2 pb-4">
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100/80 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-blue-600 dark:text-blue-400"></i> Local AI Travel Concierge
+          </span>
+          <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            Plan your next journey in <span class="text-gradient">plain English</span>
+          </h2>
+          <p class="text-slate-500 dark:text-slate-400 text-sm sm:text-base max-w-xl mx-auto">
+            Get estimated flights, boutique hotels, seasonal weather, day-by-day itineraries, and a realistic budget powered by Ollama.
+          </p>
+        </div>
+
+        <!-- Mode Selection Tabs: Plain English vs Structured Builder -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/90 dark:border-slate-800 overflow-hidden">
+          <div class="flex border-b border-slate-200 dark:border-slate-800">
+            <button id="tab-natural-btn" class="flex-1 py-3 px-4 text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/40 dark:bg-blue-950/20 transition-all">
+              <i data-lucide="message-square" class="w-4 h-4"></i>
+              <span>Type in Plain English</span>
+            </button>
+            <button id="tab-builder-btn" class="flex-1 py-3 px-4 text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-all">
+              <i data-lucide="sliders" class="w-4 h-4"></i>
+              <span>Interactive Trip Builder</span>
+            </button>
+          </div>
+
+          <!-- TAB 1: PLAIN ENGLISH INPUT -->
+          <div id="tab-natural-content" class="p-5 sm:p-6 space-y-4">
+            <div class="relative">
+              <textarea id="natural-prompt-input" rows="4" placeholder="E.g. A romantic 5-day trip to Florence and the Tuscan hills in May with a moderate budget. Focus on authentic wine tastings, historic renaissance art, scenic viewpoints, and cozy boutique hotels..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 resize-none transition-all"></textarea>
+            </div>
+
+            <!-- Suggestion Chips -->
+            <div class="space-y-1.5">
+              <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center">
+                <i data-lucide="lightbulb" class="w-3.5 h-3.5 mr-1 text-amber-500"></i> Or try one of these inspiration prompts:
+              </p>
+              <div class="flex flex-wrap gap-2 text-xs">
+                <button class="prompt-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 transition-all cursor-pointer">
+                  🌸 5 days in Kyoto & Osaka for foodie couple
+                </button>
+                <button class="prompt-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 transition-all cursor-pointer">
+                  🚲 Weekend getaway in Amsterdam for solo traveler
+                </button>
+                <button class="prompt-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 transition-all cursor-pointer">
+                  🏛️ 4 days in Rome & Vatican with pizza & architecture
+                </button>
+                <button class="prompt-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 transition-all cursor-pointer">
+                  ☀️ 7 days family road trip in Southern Portugal & Algarve
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: STRUCTURED FORM BUILDER -->
+          <div id="tab-builder-content" class="p-5 sm:p-6 space-y-5 hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Destination -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Where do you want to go? *</label>
+                <div class="relative">
+                  <i data-lucide="map-pin" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                  <input type="text" id="form-destination" placeholder="e.g. Barcelona, Spain" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/50">
+                </div>
+              </div>
+
+              <!-- Origin / Departure -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Starting from (optional)</label>
+                <div class="relative">
+                  <i data-lucide="plane-takeoff" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                  <input type="text" id="form-origin" placeholder="e.g. Frankfurt, Munich, or Berlin" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/50">
+                </div>
+              </div>
+
+              <!-- Duration -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Duration (Days)</label>
+                <div class="relative">
+                  <i data-lucide="calendar" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                  <input type="number" id="form-duration" value="4" min="1" max="30" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/50">
+                </div>
+              </div>
+
+              <!-- Timing / Season -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">When are you traveling?</label>
+                <div class="relative">
+                  <i data-lucide="sun" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                  <input type="text" id="form-season" placeholder="e.g. May 2026 / Next Autumn" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/50">
+                </div>
+              </div>
+            </div>
+
+            <!-- Budget Tier Selection -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Budget Tier</label>
+              <div class="grid grid-cols-3 gap-2.5" id="budget-selector">
+                <button type="button" data-value="Budget" class="budget-option p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-blue-500 text-left transition-all">
+                  <div class="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-200">🎒 Backpacker</div>
+                  <div class="text-[11px] text-slate-500 dark:text-slate-400">Hostels & smart savings</div>
+                </button>
+                <button type="button" data-value="Moderate" class="budget-option active-option p-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 text-left transition-all">
+                  <div class="font-bold text-xs sm:text-sm text-blue-700 dark:text-blue-300">⚖️ Moderate</div>
+                  <div class="text-[11px] text-slate-500 dark:text-slate-400">Boutique hotels & great food</div>
+                </button>
+                <button type="button" data-value="Luxury" class="budget-option p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-blue-500 text-left transition-all">
+                  <div class="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-200">💎 Luxury</div>
+                  <div class="text-[11px] text-slate-500 dark:text-slate-400">5-star resorts & fine dining</div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Travel Style Selection -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Travel Style</label>
+              <div class="flex flex-wrap gap-2" id="style-selector">
+                <button type="button" data-value="Culture & History" class="style-option active-pill px-3 py-1.5 rounded-full text-xs font-medium bg-blue-600 text-white transition-all">🏛️ Culture & History</button>
+                <button type="button" data-value="Foodie & Wine" class="style-option px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all">🍜 Foodie & Wine</button>
+                <button type="button" data-value="Adventure & Outdoors" class="style-option px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all">🏔️ Adventure & Outdoors</button>
+                <button type="button" data-value="Relaxation & Spa" class="style-option px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all">🏖️ Relaxation & Beach</button>
+                <button type="button" data-value="Romantic Getaway" class="style-option px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all">❤️ Romantic</button>
+              </div>
+            </div>
+
+            <!-- Group Composition -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Who is traveling?</label>
+              <div class="flex flex-wrap gap-2" id="travelers-selector">
+                <button type="button" data-value="Solo" class="traveler-option active-pill px-3 py-1.5 rounded-full text-xs font-medium bg-blue-600 text-white transition-all">👤 Solo Traveler</button>
+                <button type="button" data-value="Couple" class="traveler-option px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all">👫 Couple</button>
+                <button type="button" data-value="Family with kids" class="traveler-option px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all">👨‍👩‍👦 Family</button>
+                <button type="button" data-value="Group of Friends" class="traveler-option px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all">👥 Friends</button>
+              </div>
+            </div>
+
+            <!-- Special Requests -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Special Interests or Dietary Requirements (optional)</label>
+              <input type="text" id="form-special" placeholder="e.g. Vegetarian food, love art galleries, prefer public transit over taxis..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/50">
+            </div>
+          </div>
+
+          <!-- Bottom Action Bar -->
+          <div class="px-5 sm:px-6 py-4 bg-slate-50/80 dark:bg-slate-950/60 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <span class="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline-flex items-center">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-blue-500 mr-1.5"></i> Autonomously saves to PostgreSQL
+            </span>
+            <button id="generate-plan-btn" class="w-full sm:w-auto ml-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm shadow-md shadow-blue-500/25 flex items-center justify-center space-x-2 transition-all hover:scale-[1.01]">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Generate Full Travel Plan</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Generation Progress / Loader Card -->
+        <div id="generation-loader" class="hidden bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 text-center space-y-4">
+          <div class="w-14 h-14 mx-auto rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
+            <i data-lucide="compass" class="w-7 h-7 animate-spin"></i>
+          </div>
+          <div>
+            <h3 id="loader-status-title" class="text-lg font-bold text-slate-800 dark:text-slate-100">Consulting AI Travel Concierge...</h3>
+            <p id="loader-status-subtitle" class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Analyzing flights, booking options, weather, and day-by-day pacing via Ollama.</p>
+          </div>
+          <!-- Progress bar animation -->
+          <div class="w-full max-w-md mx-auto bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div id="loader-progress-bar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-full w-1/3 animate-pulse rounded-full transition-all duration-500"></div>
+          </div>
+          <p class="text-[11px] text-slate-400">This takes ~15-30s on your local GPU.</p>
+        </div>
+
+      </div>
+
+      <!-- SECTION 2: TRIP RESULTS DISPLAY (Clean Interface with Separate Sections) -->
+      <div id="trip-display-container" class="hidden max-w-5xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- Trip Header Banner -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="flex flex-wrap items-center gap-2 mb-2">
+                <span id="trip-dest-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">Destination</span>
+                <span id="trip-duration-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">4 Days</span>
+                <span id="trip-budget-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">Moderate</span>
+                <span id="trip-model-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">llama3.2</span>
+              </div>
+              <h2 id="trip-title" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Trip Title</h2>
+              <p id="trip-meta-info" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Saved in PostgreSQL • Click sections below to explore details</p>
+            </div>
+
+            <!-- Export & Action Buttons -->
+            <div id="action-buttons-bar" class="flex flex-wrap items-center gap-2 no-print">
+              <!-- Copy button -->
+              <button id="copy-plan-btn" class="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all" title="Copy formatted summary to clipboard">
+                <i data-lucide="copy" class="w-4 h-4"></i>
+                <span>Copy</span>
+              </button>
+              <!-- Download Markdown -->
+              <button id="download-md-btn" class="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all" title="Download as .md file">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Markdown</span>
+              </button>
+              <!-- Print Button -->
+              <button id="print-plan-btn" class="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all" title="Print travel itinerary">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>Print</span>
+              </button>
+              <!-- Follow-Up Chat Anchor -->
+              <button id="scroll-to-chat-btn" class="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-all">
+                <i data-lucide="message-circle" class="w-4 h-4"></i>
+                <span>Ask AI Questions</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs for Sections -->
+        <div class="border-b border-slate-200 dark:border-slate-800 no-print">
+          <nav class="flex space-x-2 sm:space-x-4 overflow-x-auto pb-1 text-xs sm:text-sm font-semibold" id="section-nav">
+            <button data-section="section-overview" class="section-tab active-tab pb-2 border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 whitespace-nowrap flex items-center space-x-1.5">
+              <i data-lucide="compass" class="w-4 h-4"></i>
+              <span>Overview</span>
+            </button>
+            <button data-section="section-flights" class="section-tab pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-1.5">
+              <i data-lucide="plane" class="w-4 h-4"></i>
+              <span>Flights & Transit</span>
+            </button>
+            <button data-section="section-hotels" class="section-tab pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-1.5">
+              <i data-lucide="building" class="w-4 h-4"></i>
+              <span>Hotels & Stays</span>
+            </button>
+            <button data-section="section-weather" class="section-tab pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-1.5">
+              <i data-lucide="cloud-sun" class="w-4 h-4"></i>
+              <span>Weather & Packing</span>
+            </button>
+            <button data-section="section-itinerary" class="section-tab pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-1.5">
+              <i data-lucide="map" class="w-4 h-4"></i>
+              <span>Day-by-Day Plan</span>
+            </button>
+            <button data-section="section-budget" class="section-tab pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-1.5">
+              <i data-lucide="wallet" class="w-4 h-4"></i>
+              <span>Budget Breakdown</span>
+            </button>
+          </nav>
+        </div>
+
+        <!-- SEPARATE SECTIONS CONTENT (Shown on web, stacked on print) -->
+        <div id="sections-container" class="space-y-6">
+
+          <!-- 1. OVERVIEW SECTION -->
+          <div id="section-overview" class="section-pane card-print bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-5">
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+              <i data-lucide="info" class="w-5 h-5 text-blue-600 mr-2"></i> Overview & Highlights
+            </h3>
+            <p id="overview-summary" class="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+              Summary description of the journey.
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <span class="text-slate-400 block mb-0.5">Best Time to Visit</span>
+                <span id="overview-best-time" class="font-semibold text-slate-800 dark:text-slate-200">Spring</span>
+              </div>
+              <div class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <span class="text-slate-400 block mb-0.5">Local Currency</span>
+                <span id="overview-currency" class="font-semibold text-slate-800 dark:text-slate-200">EUR (€)</span>
+              </div>
+              <div class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <span class="text-slate-400 block mb-0.5">Language</span>
+                <span id="overview-language" class="font-semibold text-slate-800 dark:text-slate-200">Local / English</span>
+              </div>
+              <div class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <span class="text-slate-400 block mb-0.5">Emergency Contact</span>
+                <span id="overview-emergency" class="font-semibold text-rose-600 dark:text-rose-400">112</span>
+              </div>
+            </div>
+
+            <!-- Key Highlights list -->
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Must-Experience Highlights</h4>
+              <ul id="overview-highlights" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+                <!-- Highlights injected via JS -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- 2. FLIGHTS & TRANSPORTATION SECTION -->
+          <div id="section-flights" class="section-pane card-print bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-5 hidden">
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+              <i data-lucide="plane-takeoff" class="w-5 h-5 text-indigo-600 mr-2"></i> Flights & Transportation
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Route & Duration -->
+              <div class="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs sm:text-sm">
+                <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center">
+                  <i data-lucide="route" class="w-4 h-4 text-blue-500 mr-1.5"></i> Flight Route & Hubs
+                </div>
+                <div class="text-slate-600 dark:text-slate-400">
+                  <p><span class="font-medium text-slate-700 dark:text-slate-300">Departure:</span> <span id="flight-departure">Frankfurt / Munich</span></p>
+                  <p><span class="font-medium text-slate-700 dark:text-slate-300">Arrival:</span> <span id="flight-arrival">Nearest airport</span></p>
+                  <p><span class="font-medium text-slate-700 dark:text-slate-300">Flight Duration:</span> <span id="flight-duration">Approx 2h</span></p>
+                </div>
+              </div>
+
+              <!-- Price & Airlines -->
+              <div class="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs sm:text-sm">
+                <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center">
+                  <i data-lucide="tag" class="w-4 h-4 text-emerald-500 mr-1.5"></i> Pricing & Carriers
+                </div>
+                <div class="text-slate-600 dark:text-slate-400">
+                  <p><span class="font-medium text-slate-700 dark:text-slate-300">Estimated Cost:</span> <span id="flight-cost" class="font-bold text-emerald-600 dark:text-emerald-400">€150 - €250</span></p>
+                  <p><span class="font-medium text-slate-700 dark:text-slate-300">Recommended Carriers:</span> <span id="flight-airlines">Lufthansa, Ryanair, EasyJet</span></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ground & Local Transit -->
+            <div class="space-y-3">
+              <div class="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 text-xs sm:text-sm">
+                <h4 class="font-bold text-blue-900 dark:text-blue-200 mb-1 flex items-center">
+                  <i data-lucide="train" class="w-4 h-4 mr-1.5"></i> Getting From Airport to City Center
+                </h4>
+                <p id="flight-airport-transit" class="text-slate-700 dark:text-slate-300">Express train (15 mins, €12) or airport express bus.</p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs sm:text-sm">
+                <h4 class="font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center">
+                  <i data-lucide="bus" class="w-4 h-4 mr-1.5 text-slate-500"></i> Local Public Transit Advice
+                </h4>
+                <p id="flight-local-transit" class="text-slate-600 dark:text-slate-400">Metro pass or multi-day travel card recommended.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. HOTELS & STAYS SECTION -->
+          <div id="section-hotels" class="section-pane card-print bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-5 hidden">
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+              <i data-lucide="building-2" class="w-5 h-5 text-amber-600 mr-2"></i> Hotels & Neighborhoods
+            </h3>
+
+            <!-- Neighborhoods -->
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Best Neighborhoods to Stay</h4>
+              <div id="hotels-neighborhoods-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+                <!-- Neighborhood cards injected via JS -->
+              </div>
+            </div>
+
+            <!-- Specific Hotel Recommendations -->
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Curated Hotel Recommendations</h4>
+              <div id="hotels-suggestions-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+                <!-- Hotel cards injected via JS -->
+              </div>
+            </div>
+
+            <!-- Booking advice -->
+            <div id="hotels-booking-advice-box" class="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 flex items-start space-x-2">
+              <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+              <p id="hotels-booking-advice">Booking advice text.</p>
+            </div>
+          </div>
+
+          <!-- 4. WEATHER & PACKING SECTION -->
+          <div id="section-weather" class="section-pane card-print bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-5 hidden">
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+              <i data-lucide="sun-medium" class="w-5 h-5 text-amber-500 mr-2"></i> Weather & Packing Tips
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
+              <div class="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <span class="text-slate-400 block mb-1">Expected Climate</span>
+                <span id="weather-vibe" class="font-bold text-slate-800 dark:text-slate-200">Pleasant & Sunny</span>
+              </div>
+              <div class="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <span class="text-slate-400 block mb-1">Temperature Range</span>
+                <span id="weather-temp" class="font-bold text-blue-600 dark:text-blue-400 text-base">18°C - 24°C</span>
+              </div>
+              <div class="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <span class="text-slate-400 block mb-1">Rain Likelihood</span>
+                <span id="weather-rain" class="font-bold text-slate-800 dark:text-slate-200">Low</span>
+              </div>
+            </div>
+
+            <!-- Packing Checklist -->
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Packing Essentials Checklist</h4>
+              <div id="weather-packing-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+                <!-- Checkbox items injected via JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. DAY-BY-DAY ITINERARY SECTION -->
+          <div id="section-itinerary" class="section-pane card-print bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-6 hidden">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                <i data-lucide="map-pin" class="w-5 h-5 text-rose-500 mr-2"></i> Realistic Day-by-Day Itinerary
+              </h3>
+              <span id="itinerary-days-count" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold">4 Days</span>
+            </div>
+
+            <!-- Timeline of Days -->
+            <div id="itinerary-timeline" class="space-y-6">
+              <!-- Days injected dynamically via JS -->
+            </div>
+          </div>
+
+          <!-- 6. BUDGET BREAKDOWN SECTION -->
+          <div id="section-budget" class="section-pane card-print bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-5 hidden">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                <i data-lucide="banknote" class="w-5 h-5 text-emerald-600 mr-2"></i> Rough Budget Breakdown
+              </h3>
+              <div class="text-right">
+                <span class="text-[11px] text-slate-400 block">Estimated Total</span>
+                <span id="budget-total" class="text-base sm:text-xl font-extrabold text-emerald-600 dark:text-emerald-400">€750 - €1,100</span>
+              </div>
+            </div>
+
+            <!-- Itemized Category Breakdown Cards -->
+            <div id="budget-breakdown-cards" class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+              <!-- Injected via JS -->
+            </div>
+
+            <!-- Money Saving Tips -->
+            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-2">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center">
+                <i data-lucide="piggy-bank" class="w-4 h-4 text-emerald-500 mr-1.5"></i> Money-Saving Insider Tips
+              </h4>
+              <ul id="budget-tips-list" class="space-y-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+                <!-- Tips injected via JS -->
+              </ul>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- SECTION 3: FOLLOW-UP QUESTIONS & CHAT (Ask Follow-up without starting over) -->
+        <div id="chat-section" class="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4 no-print">
+          <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+            <div class="flex items-center space-x-2">
+              <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white">Ask Follow-Up Questions</h3>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Refine activities, ask about rain options, or request dinner spots without starting over.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Prompts Chips -->
+          <div class="flex flex-wrap gap-2 text-xs">
+            <button class="chat-quick-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+              🌧️ What if it rains on Day 2?
+            </button>
+            <button class="chat-quick-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+              🍝 Suggest 3 authentic local dinner spots
+            </button>
+            <button class="chat-quick-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+              🚌 How do I get around most affordably?
+            </button>
+            <button class="chat-quick-chip bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+              👨‍👩‍👧 Are there kid-friendly adjustments?
+            </button>
+          </div>
+
+          <!-- Chat Messages History Container -->
+          <div id="chat-messages-container" class="space-y-3 max-h-96 overflow-y-auto p-1">
+            <div class="text-center py-4 text-xs text-slate-400" id="chat-empty-state">
+              No questions asked yet. Type below to converse with the planner!
+            </div>
+          </div>
+
+          <!-- Chat Input Bar -->
+          <div class="flex items-end space-x-2 pt-2">
+            <div class="flex-1 relative">
+              <textarea id="chat-input" rows="2" placeholder="Ask a question about this trip... (e.g. Can we swap Day 3 afternoon for a bike tour?)" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/50 resize-none"></textarea>
+            </div>
+            <button id="chat-send-btn" class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center space-x-1 shadow-sm transition-all">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Send</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
+      <div class="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+        <i data-lucide="trash-2" class="w-5 h-5"></i>
+      </div>
+      <div class="text-center">
+        <h3 class="font-bold text-base text-slate-900 dark:text-white">Delete Trip Itinerary?</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">This will permanently delete the trip and its chat history from PostgreSQL.</p>
+      </div>
+      <div class="flex space-x-2">
+        <button id="cancel-delete-btn" class="flex-1 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200">Cancel</button>
+        <button id="confirm-delete-btn" class="flex-1 py-2 rounded-lg bg-rose-600 text-white font-semibold text-xs hover:bg-rose-700">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- App JS -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
